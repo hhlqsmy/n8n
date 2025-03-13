@@ -2,8 +2,8 @@ import type { InsightsSummary } from '@n8n/api-types';
 import { Service } from '@n8n/di';
 import { DateTime } from 'luxon';
 import type { ExecutionLifecycleHooks } from 'n8n-core';
-import { UnexpectedError } from 'n8n-workflow';
 import type { ExecutionStatus, IRun, WorkflowExecuteMode } from 'n8n-workflow';
+import { UnexpectedError } from 'n8n-workflow';
 
 import { SharedWorkflow } from '@/databases/entities/shared-workflow';
 import { SharedWorkflowRepository } from '@/databases/repositories/shared-workflow.repository';

@@ -1,3 +1,4 @@
+import { GlobalConfig } from '@n8n/config';
 import { Container } from '@n8n/di';
 import type { DateTime } from 'luxon';
 import type { IWorkflowBase } from 'n8n-workflow';
@@ -18,6 +19,7 @@ async function getWorkflowSharing(workflow: IWorkflowBase) {
 		relations: { project: true },
 	});
 }
+export const { type: dbType } = Container.get(GlobalConfig).database;
 
 export async function createMetadata(workflow: WorkflowEntity) {
 	const insightsMetadataRepository = Container.get(InsightsMetadataRepository);
@@ -63,6 +65,30 @@ export async function createRawInsightsEvent(
 		event.timestamp = parameters.timestamp.toUTC().toJSDate();
 	}
 	return await insightsRawRepository.save(event);
+}
+
+export async function createRawInsightsEvents(
+	workflow: WorkflowEntity,
+	parametersArray: Array<{
+		type: InsightsRaw['type'];
+		value: number;
+		timestamp?: DateTime;
+	}>,
+) {
+	const insightsRawRepository = Container.get(InsightsRawRepository);
+	const metadata = await createMetadata(workflow);
+
+	const events = parametersArray.map((parameters) => {
+		const event = new InsightsRaw();
+		event.metaId = metadata.metaId;
+		event.type = parameters.type;
+		event.value = parameters.value;
+		if (parameters.timestamp) {
+			event.timestamp = parameters.timestamp.toUTC().toJSDate();
+		}
+		return event;
+	});
+	await insightsRawRepository.save(events);
 }
 
 export async function createCompactedInsightsEvent(

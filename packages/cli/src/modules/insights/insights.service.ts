@@ -11,6 +11,7 @@ import { InsightsRaw } from '@/modules/insights/entities/insights-raw';
 
 import type { TypeUnits } from './entities/insights-shared';
 import { NumberToType } from './entities/insights-shared';
+import type { InsightByWorkflowSortBy } from './repositories/insights-by-period.repository';
 import { InsightsByPeriodRepository } from './repositories/insights-by-period.repository';
 
 const shouldSkipStatus: Record<ExecutionStatus, boolean> = {
@@ -204,7 +205,7 @@ export class InsightsService {
 		nbDays: number;
 		skip?: number;
 		take?: number;
-		sortBy?: string;
+		sortBy?: InsightByWorkflowSortBy;
 	}) {
 		const { count, rows } = await this.insightsByPeriodRepository.getInsightsByWorkflow({
 			nbDays,

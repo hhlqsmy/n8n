@@ -25,7 +25,6 @@ export type InsightByWorkflowSortBy =
 const summaryParser = z
 	.object({
 		period: z.enum(['previous', 'current']),
-		// TODO: extract to abstract-entity
 		type: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]),
 
 		// depending on db engine, sum(value) can be a number or a string - because of big numbers
@@ -65,13 +64,7 @@ export class InsightsByPeriodRepository extends Repository<InsightsByPeriod> {
 		super(InsightsByPeriod, dataSource.manager);
 	}
 
-	async getPreviousAndCurrentPeriodTypeAggregates(): Promise<
-		Array<{
-			period: 'previous' | 'current';
-			type: 0 | 1 | 2 | 3;
-			total_value: string | number;
-		}>
-	> {
+	async getPreviousAndCurrentPeriodTypeAggregates() {
 		const cte =
 			dbType === 'sqlite'
 				? sql`

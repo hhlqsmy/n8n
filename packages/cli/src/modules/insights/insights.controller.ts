@@ -1,5 +1,3 @@
-//import type { InsightsSummary } from '@n8n/api-types';
-
 import type { InsightsSummary } from '@n8n/api-types';
 import type {
 	InsightsByTime,
@@ -22,7 +20,6 @@ export class InsightsController {
 	@Get('/summary')
 	@GlobalScope('insights:list')
 	async getInsightsSummary(): Promise<InsightsSummary> {
-		// eslint-disable-next-line @typescript-eslint/no-unsafe-return
 		return await this.insightsService.getInsightsSummary();
 	}
 

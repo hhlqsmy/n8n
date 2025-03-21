@@ -9,7 +9,7 @@ import {
 import { UnexpectedError } from 'n8n-workflow';
 
 import { InsightsMetadata } from './insights-metadata';
-import type { PeriodUnits } from './insights-shared';
+import type { PeriodUnit } from './insights-shared';
 import {
 	isValidPeriodNumber,
 	isValidTypeNumber,
@@ -65,7 +65,7 @@ export class InsightsByPeriod extends BaseEntity {
 		return NumberToPeriodUnit[this.periodUnit_];
 	}
 
-	set periodUnit(value: PeriodUnits) {
+	set periodUnit(value: PeriodUnit) {
 		this.periodUnit_ = PeriodUnitToNumber[value];
 	}
 

@@ -10,8 +10,17 @@ import { TypeToNumber } from '../entities/insights-shared';
 
 const dbType = Container.get(GlobalConfig).database.type;
 
+export const insightsByWorkflowSortingFields = [
+	'total',
+	'succeeded',
+	'failed',
+	'timeSaved',
+	'runTime',
+	'averageRunTime',
+];
+
 export type InsightByWorkflowSortBy =
-	`${'total' | 'succeeded' | 'failed' | 'timeSaved' | 'runTime' | 'averageRunTime'}:${'asc' | 'desc'}`;
+	`${(typeof insightsByWorkflowSortingFields)[number]}:${'asc' | 'desc'}`;
 
 const summaryParser = z
 	.object({

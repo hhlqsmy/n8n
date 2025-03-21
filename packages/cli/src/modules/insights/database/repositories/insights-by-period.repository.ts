@@ -11,6 +11,9 @@ import { PeriodUnitToNumber, TypeToNumber } from '../entities/insights-shared';
 
 const dbType = Container.get(GlobalConfig).database.type;
 
+export type InsightByWorkflowSortBy =
+	`${'total' | 'succeeded' | 'failed' | 'timeSaved' | 'runTime' | 'averageRunTime'}:${'asc' | 'desc'}`;
+
 const summaryParser = z
 	.object({
 		period: z.enum(['previous', 'current']),
@@ -269,7 +272,7 @@ export class InsightsByPeriodRepository extends Repository<InsightsByPeriod> {
 		nbDays: number;
 		skip?: number;
 		take?: number;
-		sortBy?: string;
+		sortBy?: InsightByWorkflowSortBy;
 	}) {
 		const dateSubQuery =
 			dbType === 'sqlite'
@@ -294,7 +297,6 @@ export class InsightsByPeriodRepository extends Repository<InsightsByPeriod> {
 								WHEN ${sumOfExecutions} = 0 THEN 0
 								ELSE SUM(CASE WHEN insights.type = ${TypeToNumber.failure.toString()} THEN value ELSE 0 END) / ${sumOfExecutions}
 							END AS "failureRate"`,
-				`SUM(CASE WHEN insights.type IN (${TypeToNumber.success}, ${TypeToNumber.failure}) THEN value ELSE 0 END) AS "total"`,
 				`SUM(CASE WHEN insights.type = ${TypeToNumber.runtime_ms} THEN value ELSE 0 END) AS "runTime"`,
 				`SUM(CASE WHEN insights.type = ${TypeToNumber.time_saved_min} THEN value ELSE 0 END) AS "timeSaved"`,
 				sql`CASE
@@ -311,7 +313,7 @@ export class InsightsByPeriodRepository extends Repository<InsightsByPeriod> {
 			.orderBy(`"${sortField}"`, sortOrder);
 
 		const count = (await rawRowsQuery.getRawMany()).length;
-		const rawRows = await rawRowsQuery.skip(skip).take(take).getRawMany();
+		const rawRows = await rawRowsQuery.offset(skip).limit(take).getRawMany();
 
 		return { count, rows: aggregatedInsightsByWorkflowParser.parse(rawRows) };
 	}

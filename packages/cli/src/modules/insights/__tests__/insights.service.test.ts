@@ -38,6 +38,7 @@ async function truncateAll() {
 
 // Initialize DB once for all tests
 beforeAll(async () => {
+	jest.useFakeTimers();
 	await testDb.init();
 });
 
@@ -257,6 +258,12 @@ describe('workflowExecuteAfterHandler', () => {
 		await expect(insightsService.workflowExecuteAfterHandler(ctx, run)).rejects.toThrowError(
 			`Could not find an owner for the workflow with the name '${workflow.name}' and the id '${workflow.id}'`,
 		);
+	});
+});
+
+describe('compaction', () => {
+	beforeEach(async () => {
+		await truncateAll();
 	});
 
 	describe('compactRawToHour', () => {
@@ -516,6 +523,21 @@ describe('workflowExecuteAfterHandler', () => {
 			const allCompacted = await insightsByPeriodRepository.find({ order: { periodStart: 1 } });
 			const accumulatedValues = allCompacted.reduce((acc, event) => acc + event.value, 0);
 			expect(accumulatedValues).toBe(batchSize);
+		});
+
+		test('compaction is running on schedule', async () => {
+			// ARRANGE
+			const insightsService = Container.get(InsightsService);
+
+			// spy on the compactInsights method to check if it's called
+			insightsService.compactInsights = jest.fn();
+
+			// ACT
+			// advance by 1 hour and 1 minute
+			jest.advanceTimersByTime(1000 * 60 * 60);
+
+			// ASSERT
+			expect(insightsService.compactInsights).toHaveBeenCalledTimes(1);
 		});
 	});
 

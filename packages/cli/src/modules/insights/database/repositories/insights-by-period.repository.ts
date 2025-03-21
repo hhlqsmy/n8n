@@ -329,7 +329,7 @@ export class InsightsByPeriodRepository extends Repository<InsightsByPeriod> {
 					? `CURRENT_DATE - INTERVAL '${nbDays} days'`
 					: `DATE_SUB(CURDATE(), INTERVAL ${nbDays} DAY)`;
 
-		const rawRows = await this.createQueryBuilder('insights')
+		const rawRowsQuery = this.createQueryBuilder('insights')
 			.select([
 				'insights.periodStart AS "periodStart"',
 				`SUM(CASE WHEN insights.type = ${TypeToNumber.runtime_ms} THEN value ELSE 0 END) AS "runTime"`,
@@ -339,8 +339,9 @@ export class InsightsByPeriodRepository extends Repository<InsightsByPeriod> {
 			])
 			.where(`insights.periodStart >= ${dateSubQuery}`)
 			.addGroupBy('insights.periodStart') // TODO: group by specific time scale (start with day)
-			.orderBy('insights.periodStart', 'ASC')
-			.getRawMany();
+			.orderBy('insights.periodStart', 'ASC');
+
+		const rawRows = await rawRowsQuery.getRawMany();
 
 		return aggregatedInsightsByTimeParser.parse(rawRows);
 	}

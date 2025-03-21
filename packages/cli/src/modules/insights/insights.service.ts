@@ -9,16 +9,12 @@ import { SharedWorkflow } from '@/databases/entities/shared-workflow';
 import { SharedWorkflowRepository } from '@/databases/repositories/shared-workflow.repository';
 import { InsightsMetadata } from '@/modules/insights/entities/insights-metadata';
 import { InsightsRaw } from '@/modules/insights/entities/insights-raw';
-import { sql } from '@/utils/sql';
 
-import type { PeriodUnits } from './entities/insights-shared';
-import { PeriodUnitToNumber } from './entities/insights-shared';
 import { InsightsConfig } from './insights.config';
 import { InsightsByPeriodRepository } from './repositories/insights-by-period.repository';
 import { InsightsRawRepository } from './repositories/insights-raw.repository';
 
 const config = Container.get(InsightsConfig);
-const dbType = Container.get(GlobalConfig).database.type;
 
 import type { TypeUnit } from './entities/insights-shared';
 import { NumberToType } from './entities/insights-shared';
@@ -228,21 +224,14 @@ export class InsightsService {
 		} while (numberOfCompactedHourData > 0);
 	}
 
-	private escapeField(fieldName: string) {
-		return this.insightsByPeriodRepository.manager.connection.driver.escape(fieldName);
-	}
-
 	// Compacts raw data to hourly aggregates
 	async compactRawToHour() {
 		// Build the query to gather raw insights data for the batch
-		const batchQuery = this.insightsRawRepository
-			.createQueryBuilder()
-			.select(['id', 'metaId', 'type', 'value'].map((fieldName) => this.escapeField(fieldName)))
-			.addSelect('timestamp', 'periodStart')
-			.orderBy('timestamp', 'ASC')
-			.limit(config.compactionBatchSize);
+		const batchQuery = this.insightsRawRepository.getRawInsightsBatchQuery(
+			config.compactionBatchSize,
+		);
 
-		return await this.compactSourceDataIntoInsightPeriod({
+		return await this.insightsByPeriodRepository.compactSourceDataIntoInsightPeriod({
 			sourceBatchQuery: batchQuery.getSql(),
 			sourceTableName: this.insightsRawRepository.metadata.tableName,
 			periodUnit: 'hour',
@@ -251,20 +240,13 @@ export class InsightsService {
 
 	// Compacts hourly data to daily aggregates
 	async compactHourToDay() {
-		// Build the query to gather period insights data for the batch
-		const batchQuery = this.insightsByPeriodRepository
-			.createQueryBuilder()
-			.select(
-				['id', 'metaId', 'type', 'periodStart', 'value'].map((fieldName) =>
-					this.escapeField(fieldName),
-				),
-			)
-			.where(`${this.escapeField('periodUnit')} = 0`)
-			.andWhere(`${this.escapeField('periodStart')} < ${this.getPeriodFilterExpr('day')}`)
-			.orderBy(this.escapeField('periodStart'), 'ASC')
-			.limit(config.compactionBatchSize);
+		// get hour data query for batching
+		const batchQuery = this.insightsByPeriodRepository.getPeriodInsightsBatchQuery(
+			'hour',
+			config.compactionBatchSize,
+		);
 
-		return await this.compactSourceDataIntoInsightPeriod({
+		return await this.insightsByPeriodRepository.compactSourceDataIntoInsightPeriod({
 			sourceBatchQuery: batchQuery.getSql(),
 			periodUnit: 'day',
 		});

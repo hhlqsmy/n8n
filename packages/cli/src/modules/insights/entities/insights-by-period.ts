@@ -7,7 +7,6 @@ import {
 	PrimaryGeneratedColumn,
 } from '@n8n/typeorm';
 import { UnexpectedError } from 'n8n-workflow';
-import { z } from 'zod';
 
 import { InsightsMetadata } from './insights-metadata';
 import type { PeriodUnit } from './insights-shared';

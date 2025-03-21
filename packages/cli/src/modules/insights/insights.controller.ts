@@ -25,7 +25,6 @@ export class InsightsController {
 	}
 
 	// TODO: api test for this
-	// TODO: use proper response type once defined
 	@Get('/by-workflow', { middlewares: [paginationListQueryMiddleware, sortByQueryMiddleware] })
 	@GlobalScope('insights:list')
 	async getInsightsByWorkflow(req: ListQuery.Options): Promise<InsightsByWorkflow> {
@@ -38,7 +37,6 @@ export class InsightsController {
 	}
 
 	// TODO: api test for this
-	// TODO: use proper response type once defined
 	@Get('/by-time', { middlewares: [paginationListQueryMiddleware, sortByQueryMiddleware] })
 	@GlobalScope('insights:list')
 	async getInsightsByTime(): Promise<InsightsByTime[]> {

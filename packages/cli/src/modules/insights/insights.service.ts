@@ -1,5 +1,6 @@
 import type { InsightsSummary } from '@n8n/api-types';
 import { Service } from '@n8n/di';
+import { DateTime } from 'luxon';
 import type { ExecutionLifecycleHooks } from 'n8n-core';
 import { UnexpectedError } from 'n8n-workflow';
 import type { ExecutionStatus, IRun, WorkflowExecuteMode } from 'n8n-workflow';
@@ -241,7 +242,7 @@ export class InsightsService {
 
 		return rows.map((r) => {
 			return {
-				date: r.periodStart,
+				date: DateTime.fromSQL(r.periodStart, { zone: 'utc' }).toISO(),
 				values: {
 					total: Number(r.succeeded) + Number(r.failed),
 					succeeded: Number(r.succeeded),

@@ -6,7 +6,6 @@ import { z } from 'zod';
 import { sql } from '@/utils/sql';
 
 import { InsightsByPeriod } from '../entities/insights-by-period';
-import type { TypeUnits } from '../entities/insights-shared';
 import { TypeToNumber } from '../entities/insights-shared';
 
 const dbType = Container.get(GlobalConfig).database.type;
@@ -174,7 +173,7 @@ export class InsightsByPeriodRepository extends Repository<InsightsByPeriod> {
 	// TODO: add return type once rebased on master and InsightsByTimeAndType is
 	// available
 	// TODO: add tests
-	async getInsightsByTime(nbDays: number, types: TypeUnits[]) {
+	async getInsightsByTime(nbDays: number) {
 		const dateSubQuery =
 			dbType === 'sqlite'
 				? `datetime('now', '-${nbDays} days')`
@@ -191,7 +190,6 @@ export class InsightsByPeriodRepository extends Repository<InsightsByPeriod> {
 				`SUM(CASE WHEN insights.type = ${TypeToNumber.time_saved_min} THEN value ELSE 0 END) AS "timeSaved"`,
 			])
 			.where(`insights.periodStart >= ${dateSubQuery}`)
-			.andWhere('insights.type IN (:...types)', { types: types.map((t) => TypeToNumber[t]) })
 			.addGroupBy('insights.periodStart') // TODO: group by specific time scale (start with day)
 			.orderBy('insights.periodStart', 'ASC')
 			.getRawMany();

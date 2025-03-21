@@ -195,8 +195,6 @@ export class InsightsService {
 		return result;
 	}
 
-	// TODO: add return type once rebased on master and InsightsByWorkflow is
-	// available
 	async getInsightsByWorkflow({
 		nbDays,
 		skip = 0,
@@ -207,7 +205,7 @@ export class InsightsService {
 		skip?: number;
 		take?: number;
 		sortBy?: string;
-	}): Promise<{ count: number; data: any[] }> {
+	}) {
 		const { count, rows } = await this.insightsByPeriodRepository.getInsightsByWorkflow({
 			nbDays,
 			skip,
@@ -237,11 +235,8 @@ export class InsightsService {
 		};
 	}
 
-	// TODO: add return type once rebased on master and InsightsByTimeAndType is
-	// available
-	// TODO: add tests
-	async getInsightsByTime(nbDays: number, types: TypeUnits[]) {
-		const rows = await this.insightsByPeriodRepository.getInsightsByTime(nbDays, types);
+	async getInsightsByTime(nbDays: number) {
+		const rows = await this.insightsByPeriodRepository.getInsightsByTime(nbDays);
 
 		return rows.map((r) => {
 			return {

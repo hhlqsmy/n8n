@@ -850,7 +850,6 @@ describe('getInsightsSummary', () => {
 		let project: Project;
 		let workflow1: IWorkflowDb & WorkflowEntity;
 		let workflow2: IWorkflowDb & WorkflowEntity;
-		let workflow3: IWorkflowDb & WorkflowEntity;
 
 		beforeEach(async () => {
 			await truncateAll();
@@ -858,7 +857,6 @@ describe('getInsightsSummary', () => {
 			project = await createTeamProject();
 			workflow1 = await createWorkflow({}, project);
 			workflow2 = await createWorkflow({}, project);
-			workflow3 = await createWorkflow({}, project);
 		});
 
 		test('compacted data are are grouped by workflow correctly', async () => {
@@ -946,7 +944,6 @@ describe('getInsightsSummary', () => {
 		let project: Project;
 		let workflow1: IWorkflowDb & WorkflowEntity;
 		let workflow2: IWorkflowDb & WorkflowEntity;
-		let workflow3: IWorkflowDb & WorkflowEntity;
 
 		beforeEach(async () => {
 			await truncateAll();
@@ -954,7 +951,6 @@ describe('getInsightsSummary', () => {
 			project = await createTeamProject();
 			workflow1 = await createWorkflow({}, project);
 			workflow2 = await createWorkflow({}, project);
-			workflow3 = await createWorkflow({}, project);
 		});
 
 		test('compacted data are are grouped by time correctly', async () => {

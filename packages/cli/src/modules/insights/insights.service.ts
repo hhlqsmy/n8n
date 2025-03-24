@@ -1,5 +1,5 @@
 import type { InsightsSummary } from '@n8n/api-types';
-import { Service } from '@n8n/di';
+import { Container, Service } from '@n8n/di';
 import { DateTime } from 'luxon';
 import type { ExecutionLifecycleHooks } from 'n8n-core';
 import type { ExecutionStatus, IRun, WorkflowExecuteMode } from 'n8n-workflow';
@@ -10,9 +10,7 @@ import { SharedWorkflowRepository } from '@/databases/repositories/shared-workfl
 import { OnShutdown } from '@/decorators/on-shutdown';
 import { InsightsMetadata } from '@/modules/insights/entities/insights-metadata';
 import { InsightsRaw } from '@/modules/insights/entities/insights-raw';
-import { sql } from '@/utils/sql';
 
-import type { InsightsByPeriod } from './entities/insights-by-period';
 import type { TypeUnit } from './entities/insights-shared';
 import { NumberToType } from './entities/insights-shared';
 import { InsightsConfig } from './insights.config';
@@ -264,126 +262,6 @@ export class InsightsService {
 		});
 	}
 
-	private getPeriodFilterExpr(periodUnit: PeriodUnits) {
-		const daysAgo = periodUnit === 'day' ? 90 : 180;
-		// Database-specific period start expression to filter out data to compact by days matching the periodUnit
-		let periodStartExpr = `date('now', '-${daysAgo} days')`;
-		if (dbType === 'postgresdb') {
-			periodStartExpr = `CURRENT_DATE - INTERVAL '${daysAgo} day'`;
-		} else if (dbType === 'mysqldb' || dbType === 'mariadb') {
-			periodStartExpr = `DATE_SUB(CURRENT_DATE, INTERVAL ${daysAgo} DAY)`;
-		}
-
-		return periodStartExpr;
-	}
-
-	private getPeriodStartExpr(periodUnit: PeriodUnits) {
-		// Database-specific period start expression to truncate timestamp to the periodUnit
-		// SQLite by default
-		let periodStartExpr = `strftime('%Y-%m-%d ${periodUnit === 'hour' ? '%H' : '00'}:00:00.000', periodStart)`;
-		if (dbType === 'mysqldb' || dbType === 'mariadb') {
-			periodStartExpr =
-				periodUnit === 'hour'
-					? "DATE_FORMAT(periodStart, '%Y-%m-%d %H:00:00')"
-					: "DATE_FORMAT(periodStart, '%Y-%m-%d 00:00:00')";
-		} else if (dbType === 'postgresdb') {
-			periodStartExpr = `DATE_TRUNC('${periodUnit}', ${this.escapeField('periodStart')})`;
-		}
-
-		return periodStartExpr;
-	}
-
-	async compactSourceDataIntoInsightPeriod({
-		sourceBatchQuery, // Query to get batch source data. Must return those fields: 'id', 'metaId', 'type', 'periodStart', 'value'
-		sourceTableName = this.insightsByPeriodRepository.metadata.tableName, // Repository references for table operations
-		periodUnit,
-	}: {
-		sourceBatchQuery: string;
-		sourceTableName?: string;
-		periodUnit: PeriodUnits;
-	}): Promise<number> {
-		// Create temp table that only exists in this transaction for rows to compact
-		const getBatchAndStoreInTemporaryTable = sql`
-			CREATE TEMPORARY TABLE rows_to_compact AS
-			${sourceBatchQuery};
-		`;
-
-		const countBatch = sql`
-			SELECT COUNT(*) ${this.escapeField('rowsInBatch')} FROM rows_to_compact;
-		`;
-
-		const targetColumnNamesStr = ['metaId', 'type', 'periodUnit', 'periodStart']
-			.map((param) => this.escapeField(param))
-			.join(', ');
-		const targetColumnNamesWithValue = `${targetColumnNamesStr}, value`;
-
-		// Get the start period expression depending on the period unit and database type
-		const periodStartExpr = this.getPeriodStartExpr(periodUnit);
-
-		// Function to get the aggregation query
-		const aggregationQuery = this.insightsByPeriodRepository.manager
-			.createQueryBuilder()
-			.select(this.escapeField('metaId'))
-			.addSelect(this.escapeField('type'))
-			.addSelect(PeriodUnitToNumber[periodUnit].toString(), 'periodUnit')
-			.addSelect(periodStartExpr, 'periodStart')
-			.addSelect(`SUM(${this.escapeField('value')})`, 'value')
-			.from('rows_to_compact', 'rtc')
-			.groupBy(this.escapeField('metaId'))
-			.addGroupBy(this.escapeField('type'))
-			.addGroupBy(periodStartExpr);
-
-		// Insert or update aggregated data
-		const insertQueryBase = sql`
-			INSERT INTO ${this.insightsByPeriodRepository.metadata.tableName}
-				(${targetColumnNamesWithValue})
-			${aggregationQuery.getSql()}
-		`;
-
-		// Database-specific duplicate key logic
-		let deduplicateQuery: string;
-		if (dbType === 'mysqldb' || dbType === 'mariadb') {
-			deduplicateQuery = sql`
-				ON DUPLICATE KEY UPDATE value = value + VALUES(value)`;
-		} else {
-			deduplicateQuery = sql`
-				ON CONFLICT(${targetColumnNamesStr})
-				DO UPDATE SET value = ${this.insightsByPeriodRepository.metadata.tableName}.value + excluded.value
-				RETURNING *`;
-		}
-
-		const upsertEvents = sql`
-			${insertQueryBase}
-			${deduplicateQuery}
-		`;
-
-		// Delete the processed rows
-		const deleteBatch = sql`
-			DELETE FROM ${sourceTableName}
-			WHERE id IN (SELECT id FROM rows_to_compact);
-		`;
-
-		// Clean up
-		const dropTemporaryTable = sql`
-			DROP TABLE rows_to_compact;
-		`;
-
-		const result = await this.insightsByPeriodRepository.manager.transaction(async (trx) => {
-			await trx.query(getBatchAndStoreInTemporaryTable);
-
-			await trx.query<Array<{ type: any; value: number }>>(upsertEvents);
-
-			const rowsInBatch = await trx.query<[{ rowsInBatch: number | string }]>(countBatch);
-
-			await trx.query(deleteBatch);
-			await trx.query(dropTemporaryTable);
-
-			return Number(rowsInBatch[0].rowsInBatch);
-		});
-
-		return result;
-	}
-
 	async getInsightsByWorkflow({
 		nbDays,
 		skip = 0,
@@ -440,106 +318,5 @@ export class InsightsService {
 				},
 			};
 		});
-	}
-
-	async compactHourToDay() {
-		const batchSize = 500;
-
-		// Create temp table that only exists in this transaction for rows to
-		// compact.
-		const batchedInsightsByPeriodQuery = this.insightsByPeriodRepository
-			.createQueryBuilder()
-			.select(
-				['id', 'metaId', 'type', 'periodUnit', 'periodStart', 'value'].map(getQuotedIdentifier),
-			)
-			.where(`${getQuotedIdentifier('periodUnit')} = 0`)
-			.orderBy(getQuotedIdentifier('periodStart'), 'ASC')
-			.limit(batchSize);
-
-		// Create temp table that only exists in this transaction for rows to
-		// compact.
-		const getBatchAndStoreInTemporaryTable = sql`
-				CREATE TEMPORARY TABLE rows_to_compact AS
-				${batchedInsightsByPeriodQuery.getSql()};
-			`;
-
-		const countBatch = sql`
-			SELECT COUNT(*) rowsInBatch FROM rows_to_compact;
-		`;
-
-		let periodStartExpr = "strftime('%s', periodStart, 'unixepoch', 'start of day')";
-		switch (dbType) {
-			case 'mysqldb':
-			case 'mariadb':
-				periodStartExpr = "DATE_FORMAT(periodStart, '%Y-%m-%d 00:00:00')";
-				break;
-			case 'postgresdb':
-				periodStartExpr = 'DATE_TRUNC(\'day\', "periodStart")';
-				break;
-		}
-
-		const insightByPeriodColumnNames = ['metaId', 'type', 'periodUnit', 'periodStart']
-			.map(getQuotedIdentifier)
-			.join(', ');
-		const insightByPeriodColumnNamesWithValue = `${insightByPeriodColumnNames}, value`;
-
-		const aggregateRawInsightsQuery = this.insightsByPeriodRepository.manager
-			.createQueryBuilder()
-			.select([getQuotedIdentifier('metaId'), getQuotedIdentifier('type')])
-			.addSelect('1', 'periodUnit')
-			.addSelect(periodStartExpr, 'periodStart')
-			.addSelect(`SUM(${getQuotedIdentifier('value')})`, 'value')
-			.from('rows_to_compact', 'rtc')
-			.groupBy(getQuotedIdentifier('metaId'))
-			.addGroupBy(getQuotedIdentifier('type'))
-			.addGroupBy(getQuotedIdentifier('periodStart'));
-
-		// Insert or update aggregated data
-		const insertQueryBase = sql`
-				INSERT INTO ${this.insightsByPeriodRepository.metadata.tableName} (${insightByPeriodColumnNamesWithValue})
-				${aggregateRawInsightsQuery.getSql()}
-			`;
-
-		// Database-specific upsert part
-		let upsertEvents: string;
-		if (dbType === 'mysqldb' || dbType === 'mariadb') {
-			upsertEvents = sql`${insertQueryBase}
-				ON DUPLICATE KEY UPDATE value = value + VALUES(value)`;
-		} else {
-			upsertEvents = sql`${insertQueryBase}
-				ON CONFLICT(${insightByPeriodColumnNames})
-				DO UPDATE SET value = ${this.insightsByPeriodRepository.metadata.tableName}.value + excluded.value
-				RETURNING *`;
-		}
-
-		console.log(upsertEvents);
-
-		// Delete the processed rows
-		const deleteBatch = sql`
-					DELETE FROM ${this.insightsByPeriodRepository.metadata.tableName}
-					WHERE id IN (SELECT id FROM rows_to_compact);
-			`;
-
-		// Clean up
-		const dropTemporaryTable = sql`
-			DROP TABLE rows_to_compact;
-		`;
-
-		const result = await this.insightsByPeriodRepository.manager.transaction(async (trx) => {
-			console.log(getBatchAndStoreInTemporaryTable);
-			console.log(await trx.query(getBatchAndStoreInTemporaryTable));
-
-			await trx.query<Array<{ type: InsightsByPeriod['type_']; value: number }>>(upsertEvents);
-
-			const rowsInBatch = await trx.query<[{ rowsInBatch: number }]>(countBatch);
-
-			await trx.query(deleteBatch);
-			await trx.query(dropTemporaryTable);
-
-			return rowsInBatch[0].rowsInBatch;
-		});
-
-		console.log('result', result);
-		return result;
 	}
 }

@@ -10,20 +10,17 @@ import { SharedWorkflowRepository } from '@/databases/repositories/shared-workfl
 import { OnShutdown } from '@/decorators/on-shutdown';
 import { InsightsMetadata } from '@/modules/insights/entities/insights-metadata';
 import { InsightsRaw } from '@/modules/insights/entities/insights-raw';
+import { sql } from '@/utils/sql';
 
+import type { InsightsByPeriod } from './entities/insights-by-period';
+import type { TypeUnit } from './entities/insights-shared';
+import { NumberToType } from './entities/insights-shared';
 import { InsightsConfig } from './insights.config';
 import { InsightsByPeriodRepository } from './repositories/insights-by-period.repository';
+import type { InsightByWorkflowSortBy } from './repositories/insights-by-period.repository';
 import { InsightsRawRepository } from './repositories/insights-raw.repository';
 
 const config = Container.get(InsightsConfig);
-
-import type { TypeUnit } from './entities/insights-shared';
-import { NumberToType } from './entities/insights-shared';
-import type { InsightByWorkflowSortBy } from './repositories/insights-by-period.repository';
-import { InsightsByPeriodRepository } from './repositories/insights-by-period.repository';
-import { InsightsRawRepository } from './repositories/insights-raw.repository';
-import { sql } from '@/utils/sql';
-import { InsightsByPeriod } from './entities/insights-by-period';
 
 const shouldSkipStatus: Record<ExecutionStatus, boolean> = {
 	success: false,
@@ -219,6 +216,8 @@ export class InsightsService {
 				deviation: currentTotal - previousTotal,
 			},
 		};
+
+		return result;
 	}
 
 	async compactInsights() {

@@ -11,18 +11,6 @@ import { PeriodUnitToNumber, TypeToNumber } from '../entities/insights-shared';
 
 const dbType = Container.get(GlobalConfig).database.type;
 
-export const insightsByWorkflowSortingFields = [
-	'total',
-	'succeeded',
-	'failed',
-	'timeSaved',
-	'runTime',
-	'averageRunTime',
-];
-
-export type InsightByWorkflowSortBy =
-	`${(typeof insightsByWorkflowSortingFields)[number]}:${'asc' | 'desc'}`;
-
 const summaryParser = z
 	.object({
 		period: z.enum(['previous', 'current']),
@@ -281,7 +269,7 @@ export class InsightsByPeriodRepository extends Repository<InsightsByPeriod> {
 		nbDays: number;
 		skip?: number;
 		take?: number;
-		sortBy?: InsightByWorkflowSortBy;
+		sortBy?: string;
 	}) {
 		const dateSubQuery =
 			dbType === 'sqlite'
